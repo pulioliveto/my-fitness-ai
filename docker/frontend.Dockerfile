@@ -4,10 +4,10 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Copia los archivos de tu frontend al contenedor
-COPY frontend/frontend/package.json frontend/frontend/yarn.lock* ./
+COPY frontend/package.json frontend/yarn.lock* ./
 RUN yarn install --frozen-lockfile || yarn install
 
-COPY frontend/frontend ./
+COPY frontend ./
 
 # Construye la app Next.js
 RUN yarn build
