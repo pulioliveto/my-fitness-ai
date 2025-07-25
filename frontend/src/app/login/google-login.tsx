@@ -1,21 +1,34 @@
 "use client"
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function Component() {
-   const loginWithGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
+  const router = useRouter()
+  
+  const loginWithGoogle = async () => {
+    // Realizar login con Google
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      }
     })
-  }
-    const handleGoogleLogin = async () => {
-        try {
-        await loginWithGoogle()
-        } catch (error) {
-        console.error('Error during Google login:', error)
-        }
+    
+    if (error) {
+      console.error('Error during Google login:', error)
     }
+  }
+  
+  const handleGoogleLogin = async () => {
+    try {
+      await loginWithGoogle()
+    } catch (error) {
+      console.error('Error during Google login:', error)
+    }
+  }
+  
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
       <Card className="w-full max-w-md shadow-xl border-0 bg-white/80 backdrop-blur-sm">

@@ -1,5 +1,5 @@
 "use client";
-
+import { useRouter } from "next/navigation";
 import {
   HeroSection,
   FeaturesSection,
@@ -8,8 +8,10 @@ import {
 } from "@/components/landing";
 
 export default function Page() {
+  const router = useRouter();
+
   const handleGetStarted = () => {
-    window.location.href = "/login"; // o usa next/navigation: router.push('/login')
+    router.push("/login");
   };
 
   return (
