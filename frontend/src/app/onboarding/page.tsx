@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient'
 import WelcomeStep from '@/components/onboarding/WelcomeStep'
 import UserDataStep from '@/components/onboarding/UserDataStep'
 import GoalsStep, { type GoalId } from '@/components/onboarding/GoalsStep'
+import ActivityLevelStep from '@/components/onboarding/ActivityLevelStep'
 import { AnimatePresence } from 'framer-motion'
 
 export default function OnboardingPage() {
@@ -15,7 +16,8 @@ export default function OnboardingPage() {
     weight: '',
     age: '',
     gender: '',
-    goals: [] as GoalId[]
+    goals: [] as GoalId[],
+    activityLevel: ''
   })
   const [userName, setUserName] = useState('')
   const router = useRouter()
@@ -62,58 +64,85 @@ export default function OnboardingPage() {
   }
   
   // Completar onboarding con el objetivo final
-  const handleComplete = async (goal: GoalId) => {
+  const handleComplete = async (activityLevel: string) => {
     try {
-      // Obtener sesión activa
-      const { data: { session } } = await supabase.auth.getSession();
+      console.log("Iniciando guardado con nivel:", activityLevel);
+      console.log("Estado actual userData:", userData);
+      
+      // Obtener sesión
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error("Error obteniendo sesión:", sessionError);
+        return;
+      }
       
       if (!session) {
         console.error("No hay sesión activa");
         return;
       }
       
-      const user = session.user;
-      
-      // Usar datos validados
+      // Crear un objeto con tipos explícitos para evitar problemas
       const profileData = {
-        user_id: user.id,
-        has_completed_onboarding: true,
-        // Valores NULL explícitos para campos vacíos
+        user_id: session.user.id,
+        fitness_goals: userData.goals, // Asegurando que sea un array
+        activity_level: activityLevel, // El valor seleccionado
         height: userData.height ? parseFloat(userData.height) : null,
         weight: userData.weight ? parseFloat(userData.weight) : null,
         age: userData.age ? parseInt(userData.age) : null,
         gender: userData.gender || null,
-        fitness_goals: [goal]
+        has_completed_onboarding: true
       };
       
-      // Intentar un enfoque diferente: primero UPDATE, luego INSERT si falla
-      const { error: updateError } = await supabase
+      console.log("Datos a guardar:", JSON.stringify(profileData));
+      
+      // Intenta un enfoque más simple: primero verifica si el perfil existe
+      const { data: existingProfile, error: checkError } = await supabase
         .from('user_profiles')
-        .update(profileData)
-        .eq('user_id', user.id);
+        .select('id')
+        .eq('user_id', session.user.id)
+        .single();
         
-      // Si UPDATE falla (porque no existe), intenta INSERT
-      if (updateError) {
-        console.log("Error en update, intentando insert:", updateError);
-        const { error: insertError } = await supabase
-          .from('user_profiles')
-          .insert(profileData);
-          
-        if (insertError) {
-          console.error("Error en insert:", insertError);
-          throw insertError;
-        }
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no results found
+        console.error("Error verificando perfil existente:", checkError);
       }
       
-      router.push('/dashboard');
+      // Decide si hacer update o insert
+      let result;
+      if (existingProfile) {
+        console.log("Actualizando perfil existente");
+        result = await supabase
+          .from('user_profiles')
+          .update(profileData)
+          .eq('user_id', session.user.id);
+      } else {
+        console.log("Creando nuevo perfil");
+        result = await supabase
+          .from('user_profiles')
+          .insert(profileData);
+      }
+      
+      if (result.error) {
+        console.error("Error en operación de BD:", result.error);
+        throw result.error;
+      }
+      
+      console.log("Perfil guardado exitosamente");
+      router.push('/generating-routine');
     } catch (error) {
-      console.error("Error capturado:", error);
+      console.error("Error completo:", error);
+      // Mostrar mensaje al usuario
+      alert("Hubo un problema al guardar tus datos. Por favor intenta nuevamente.");
     }
   }
   
   // Usar useCallback para evitar recreaciones de la función
   const handleGoalsChange = useCallback((goals: GoalId[]) => {
     setUserData(prev => ({ ...prev, goals }))
+  }, []);
+  
+  const handleActivityLevelChange = useCallback((activityLevel: string) => {
+    setUserData(prev => ({ ...prev, activityLevel }))
   }, []);
   
   return (
@@ -140,10 +169,19 @@ export default function OnboardingPage() {
         {step === 2 && (
           <GoalsStep 
             key="goals"
-            onComplete={handleComplete}
+            onComplete={handleNext}
             onPrevious={handlePrevious}
             onChange={handleGoalsChange} // Usa la función con useCallback
             selectedGoals={userData.goals}
+          />
+        )}
+        {step === 3 && (
+          <ActivityLevelStep 
+            key="activityLevel"
+            onComplete={handleComplete}
+            onPrevious={handlePrevious}
+            onChange={handleActivityLevelChange} // Usa la función con useCallback
+            selectedActivityLevel={userData.activityLevel}
           />
         )}
       </AnimatePresence>

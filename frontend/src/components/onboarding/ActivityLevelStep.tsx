@@ -1,6 +1,6 @@
 "use client"
 
-import { memo, useState, KeyboardEvent } from "react"
+import { memo, useEffect, useState, KeyboardEvent } from "react"
 import { motion, useReducedMotion, Variants } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import {
@@ -20,8 +20,10 @@ export const ActivityLevelSchema = z.enum(["sedentary", "moderate", "active"])
 export type ActivityLevel = z.infer<typeof ActivityLevelSchema>
 
 interface ActivityLevelStepProps {
-  onNext: (level: ActivityLevel) => void
-  onBack: () => void
+  onComplete: (level: ActivityLevel) => void // Cambiado de onNext
+  onPrevious: () => void                     // Cambiado de onBack
+  onChange: (level: ActivityLevel) => void   // Añadir onChange
+  selectedActivityLevel?: ActivityLevel      // Añadir selectedActivityLevel
 }
 
 /* ---------------------------------- */
@@ -86,14 +88,32 @@ const containerVariants: Variants = {
 /*            Componente              */
 /* ---------------------------------- */
 
-function ActivityLevelStepComponent({ onNext, onBack }: ActivityLevelStepProps) {
-  const [selectedLevel, setSelectedLevel] = useState<ActivityLevel | null>(null)
+function ActivityLevelStepComponent({ onComplete, onPrevious, onChange, selectedActivityLevel }: ActivityLevelStepProps) {
+  // Inicializar con el valor seleccionado si existe
+  const [selectedLevel, setSelectedLevel] = useState<ActivityLevel | null>(
+    selectedActivityLevel || null
+  )
   const reduceMotion = useReducedMotion()
 
+  // Cuando cambia la selección, notificar al padre
+  useEffect(() => {
+    if (selectedLevel) {
+      onChange(selectedLevel)
+    }
+  }, [selectedLevel, onChange])
+
+  // Cambiar onNext por onComplete
   const handleFinish = () => {
-    if (!selectedLevel) return
-    const parsed = ActivityLevelSchema.safeParse(selectedLevel)
-    if (parsed.success) onNext(parsed.data)
+    if (!selectedLevel) return;
+    
+    const parsed = ActivityLevelSchema.safeParse(selectedLevel);
+    if (parsed.success) {
+      console.log("ActivityLevelStep: Nivel seleccionado:", parsed.data);
+      // Esta línea es crucial - asegúrate de que esté llamando a onComplete
+      onComplete(parsed.data);
+    } else {
+      console.error("Error validando nivel:", parsed.error);
+    }
   }
 
   const handleKeySelect = (e: KeyboardEvent<HTMLDivElement>, id: ActivityLevel) => {
@@ -186,7 +206,10 @@ function ActivityLevelStepComponent({ onNext, onBack }: ActivityLevelStepProps) 
                 transition={{ duration: 0.6, delay: 0.3 + index * 0.1 }}
                 whileHover={reduceMotion ? {} : { scale: 1.02, y: -2 }}
                 whileTap={reduceMotion ? {} : { scale: 0.98 }}
-                onClick={() => setSelectedLevel(level.id)}
+                onClick={() => {
+                  setSelectedLevel(level.id)
+                  onChange(level.id)
+                }}
               >
                 <div className="flex items-start space-x-4">
                   <motion.div
@@ -239,7 +262,7 @@ function ActivityLevelStepComponent({ onNext, onBack }: ActivityLevelStepProps) 
             className="flex-1"
           >
           <Button
-            onClick={onBack}
+            onClick={onPrevious}
             variant="outline"
             size="lg"
             className="w-full border-white/30 text-white hover:bg-white/10 py-3 rounded-xl backdrop-blur-sm bg-transparent"
